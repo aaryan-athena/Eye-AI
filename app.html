@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fundus AI · Screener</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: { 400:'#5c9cf5', 500:'#3b78eb', 600:'#2558df', 700:'#1d45cc', 900:'#1e3483', 950:'#162155' },
+          },
+          animation: {
+            'fade-in':   'fadeIn .4s ease both',
+            'slide-up':  'slideUp .45s ease both',
+            'spin-slow': 'spin 2s linear infinite',
+          },
+          keyframes: {
+            fadeIn:  { from:{ opacity:0 },                              to:{ opacity:1 } },
+            slideUp: { from:{ opacity:0, transform:'translateY(20px)' }, to:{ opacity:1, transform:'none' } },
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    * { font-family: 'Inter', sans-serif; }
+    body { background: #0b1120; }
+    .mesh-bg {
+      background:
+        radial-gradient(ellipse 80% 60% at 10% 0%,  rgba(37,88,223,.18) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 50% at 90% 100%, rgba(139,92,246,.12) 0%, transparent 55%),
+        #0b1120;
+    }
+    .glass { background:rgba(15,23,42,.7); backdrop-filter:blur(20px); border:1px solid rgba(255,255,255,.07); }
+    #drop-zone.dragging { border-color:#3b78eb !important; background:rgba(59,120,235,.06) !important; }
+    .bar-fill { transition: width .8s cubic-bezier(.22,1,.36,1); }
+    .tab-active { background:rgba(59,120,235,.18); border-color:rgba(59,120,235,.5); color:#90bfff; }
+    ::-webkit-scrollbar { width:6px; }
+    ::-webkit-scrollbar-thumb { background:rgba(255,255,255,.12); border-radius:3px; }
+  </style>
+</head>
+
+<body class="mesh-bg min-h-screen text-slate-200 antialiased">
+
+  <!-- Header -->
+  <header class="border-b border-white/5 px-6 py-4">
+    <div class="max-w-6xl mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <a href="index.html" class="flex items-center gap-2.5 hover:opacity-80 transition">
+          <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-violet-500 flex items-center justify-center">
+            <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.964-7.178z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+          </div>
+          <span class="font-bold text-white text-sm">Fundus AI</span>
+        </a>
+        <span class="text-slate-700 text-sm">/ Screener</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2 text-xs text-slate-500 bg-white/5 border border-white/8 rounded-full px-3 py-1.5">
+          <span id="status-dot" class="w-1.5 h-1.5 rounded-full bg-slate-600"></span>
+          <span id="status-text">Connecting…</span>
+        </div>
+        <a href="index.html" class="text-xs text-slate-500 hover:text-slate-300 transition">← Back to home</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-6 py-10 space-y-8">
+
+    <!-- Disclaimer -->
+    <div class="glass rounded-xl px-5 py-3 flex items-start gap-3 border border-amber-500/20 bg-amber-500/5 animate-fade-in">
+      <svg class="w-5 h-5 text-amber-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
+      </svg>
+      <p class="text-xs text-amber-200/80 leading-relaxed">
+        <span class="font-semibold text-amber-300">Clinical Decision Support Only.</span>
+        This tool assists screening — it does not replace diagnosis by a qualified ophthalmologist.
+        Always obtain a specialist review before clinical action.
+      </p>
+    </div>
+
+    <!-- Upload + Results grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+      <!-- Upload panel -->
+      <div class="glass rounded-2xl p-6 flex flex-col gap-5 animate-slide-up">
+        <div>
+          <h2 class="text-sm font-semibold text-slate-200 tracking-wide uppercase">Upload Fundus Image</h2>
+          <p class="text-xs text-slate-500 mt-1">JPEG, PNG, BMP or TIFF · Max 20 MB</p>
+        </div>
+
+        <label id="drop-zone" for="file-input"
+               class="relative flex flex-col items-center justify-center gap-3 rounded-xl
+                      border-2 border-dashed border-white/10 p-10 cursor-pointer transition-all
+                      hover:border-brand-500/50 hover:bg-brand-500/5 group">
+          <div class="w-14 h-14 rounded-full bg-brand-900/60 flex items-center justify-center ring-1
+                      ring-white/10 group-hover:ring-brand-500/40 transition">
+            <svg class="w-7 h-7 text-brand-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
+            </svg>
+          </div>
+          <div class="text-center">
+            <p class="text-sm font-medium text-slate-300">Drop image here or <span class="text-brand-400">browse</span></p>
+            <p class="text-xs text-slate-600 mt-1">Colour retinal fundus photographs</p>
+          </div>
+          <input id="file-input" type="file" accept="image/*" class="hidden" />
+          <img id="preview-img" class="hidden absolute inset-0 w-full h-full object-cover rounded-xl opacity-20" alt="" />
+        </label>
+
+        <div id="file-info" class="hidden items-center gap-3 bg-white/5 rounded-lg px-4 py-3">
+          <svg class="w-4 h-4 text-brand-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"/>
+          </svg>
+          <div class="min-w-0 flex-1">
+            <p id="file-name" class="text-xs text-slate-300 font-medium truncate"></p>
+            <p id="file-size" class="text-xs text-slate-600"></p>
+          </div>
+          <button id="clear-btn" class="text-slate-600 hover:text-rose-400 transition">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+
+        <button id="analyse-btn" disabled
+                class="w-full rounded-xl py-3 text-sm font-semibold transition-all
+                       bg-brand-600/30 text-brand-300/40 cursor-not-allowed
+                       disabled:pointer-events-none">
+          Analyse Image
+        </button>
+
+        <div id="loading" class="hidden flex-col items-center justify-center gap-3 py-4">
+          <div class="w-10 h-10 rounded-full border-2 border-white/10 border-t-brand-500 animate-spin-slow"></div>
+          <p class="text-xs text-slate-500 animate-pulse">Running inference + Grad-CAM…</p>
+        </div>
+      </div>
+
+      <!-- Results panel -->
+      <div class="glass rounded-2xl p-6 flex flex-col gap-5 animate-slide-up" style="animation-delay:.08s">
+
+        <div id="empty-state" class="flex-1 flex flex-col items-center justify-center gap-4 text-center py-12">
+          <div class="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center">
+            <svg class="w-8 h-8 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.4">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5M9 11.25v1.5M12 9v3.75m3-6v6"/>
+            </svg>
+          </div>
+          <div>
+            <p class="text-sm font-medium text-slate-400">No analysis yet</p>
+            <p class="text-xs text-slate-600 mt-1">Upload a fundus image to begin screening</p>
+          </div>
+        </div>
+
+        <div id="result-content" class="hidden flex-col gap-5">
+          <div class="flex items-center justify-between">
+            <h2 class="text-sm font-semibold text-slate-200 tracking-wide uppercase">Diagnosis</h2>
+            <span id="priority-badge" class="hidden text-xs font-semibold px-2.5 py-1 rounded-full
+                                             bg-rose-500/15 text-rose-400 border border-rose-500/20">
+              Warning: High-cost miss risk
+            </span>
+          </div>
+
+          <div id="prediction-card" class="rounded-xl p-5 flex items-center gap-4 border">
+            <div id="pred-icon" class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"></div>
+            <div>
+              <p id="pred-class" class="text-lg font-bold text-white leading-none"></p>
+              <p id="pred-conf"  class="text-xs text-slate-400 mt-1.5"></p>
+            </div>
+            <div class="ml-auto">
+              <div class="relative w-14 h-14">
+                <svg class="w-14 h-14 -rotate-90" viewBox="0 0 48 48">
+                  <circle cx="24" cy="24" r="20" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="4"/>
+                  <circle id="conf-arc" cx="24" cy="24" r="20" fill="none" stroke-width="4"
+                          stroke-linecap="round" stroke-dasharray="125.66" stroke-dashoffset="125.66"
+                          style="transition:stroke-dashoffset .9s cubic-bezier(.22,1,.36,1)"/>
+                </svg>
+                <span id="conf-pct" class="absolute inset-0 flex items-center justify-center text-xs font-bold text-white"></span>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Class Confidence Scores</h3>
+            <div id="class-bars" class="space-y-2.5"></div>
+          </div>
+
+          <div>
+            <div class="flex gap-2 mb-3">
+              <button data-tab="original" class="tab-btn tab-active text-xs px-3 py-1.5 rounded-lg border border-white/10 transition-all">Original</button>
+              <button data-tab="gradcam"  class="tab-btn text-xs px-3 py-1.5 rounded-lg border border-white/10 text-slate-500 hover:text-slate-300 transition-all">Grad-CAM</button>
+            </div>
+            <div class="relative rounded-xl overflow-hidden bg-black/30 aspect-square">
+              <img id="img-original" class="w-full h-full object-contain" alt="Original fundus" />
+              <img id="img-gradcam"  class="hidden w-full h-full object-contain" alt="Grad-CAM overlay" />
+              <div id="gradcam-legend" class="hidden absolute bottom-2 left-2 right-2 flex items-center justify-between px-3 py-1.5 rounded-lg bg-black/60 backdrop-blur-sm">
+                <span class="text-xs text-slate-300">Attention heatmap</span>
+                <div class="flex items-center gap-1 text-xs">
+                  <span class="w-4 h-2 rounded bg-gradient-to-r from-blue-600 via-green-400 to-red-500 block"></span>
+                  <span class="text-slate-500">low → high</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="error-state" class="hidden flex-col items-center justify-center gap-3 py-8 text-center">
+          <div class="w-12 h-12 rounded-full bg-rose-500/10 flex items-center justify-center">
+            <svg class="w-6 h-6 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
+            </svg>
+          </div>
+          <div>
+            <p class="text-sm font-medium text-rose-400">Analysis Failed</p>
+            <p id="error-msg" class="text-xs text-slate-500 mt-1 max-w-xs"></p>
+          </div>
+          <button id="retry-btn" class="text-xs text-brand-400 hover:underline mt-1">Try again</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Class reference -->
+    <section class="animate-slide-up" style="animation-delay:.15s">
+      <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-4">Detected Classes</h2>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div class="glass rounded-xl p-4 border border-emerald-500/15 hover:border-emerald-500/30 transition">
+          <div class="text-2xl mb-2">🟢</div>
+          <p class="text-sm font-semibold text-emerald-400">Normal</p>
+          <p class="text-xs text-slate-500 mt-1 leading-relaxed">No clinically significant retinal pathology detected.</p>
+        </div>
+        <div class="glass rounded-xl p-4 border border-rose-500/15 hover:border-rose-500/30 transition">
+          <div class="text-2xl mb-2">🩸</div>
+          <p class="text-sm font-semibold text-rose-400">Diabetic Retinopathy</p>
+          <p class="text-xs text-slate-500 mt-1 leading-relaxed">Microaneurysms, haemorrhages, neovascularisation.</p>
+        </div>
+        <div class="glass rounded-xl p-4 border border-amber-500/15 hover:border-amber-500/30 transition">
+          <div class="text-2xl mb-2">🌫️</div>
+          <p class="text-sm font-semibold text-amber-400">Cataract</p>
+          <p class="text-xs text-slate-500 mt-1 leading-relaxed">Lens opacity causing blurred / hazy fundus view.</p>
+        </div>
+        <div class="glass rounded-xl p-4 border border-violet-500/15 hover:border-violet-500/30 transition">
+          <div class="text-2xl mb-2">🔵</div>
+          <p class="text-sm font-semibold text-violet-400">Glaucoma</p>
+          <p class="text-xs text-slate-500 mt-1 leading-relaxed">Enlarged cup-to-disc ratio, optic nerve damage.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="border-t border-white/5 py-5 px-6 mt-8">
+    <div class="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-2">
+      <p class="text-xs text-slate-600">Fundus AI · Clinical Decision Support Tool · Not for diagnostic use</p>
+      <p class="text-xs text-slate-700">EfficientNetV2-S · Transfer Learning · Grad-CAM Explainability</p>
+    </div>
+  </footer>
+
+  <script src="static/config.js"></script>
+  <script src="static/app.js"></script>
+</body>
+</html>
